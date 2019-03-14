@@ -382,12 +382,13 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
 {
   KEY_T mrk;
   SIZE_T mrp;
-  return InsertAtNode(superblock.info.rootnode, key, value, mrk, mrp, false);
+  bool c = false;
+  return InsertAtNode(superblock.info.rootnode, key, value, mrk, mrp, c);
 }
 
 ERROR_T BTreeIndex::InsertAtNode(SIZE_T &node,
-                                 KEY_T &key,
-                                 VALUE_T &value,
+                                 const KEY_T &key,
+                                 const VALUE_T &value,
                                  KEY_T &maybe_rhs_key,
                                  SIZE_T &maybe_rhs_ptr,
                                  bool &rhs_created)
@@ -490,7 +491,7 @@ ERROR_T BTreeIndex::InsertAtNode(SIZE_T &node,
         KeyValuePair kvp = KeyValuePair(key, value);
         //hopefully numkeys works again instead of an offset
         //that's what dinda did in LookupOrUpdate after the for loop
-        rc = b.InsertKeyVal(numkeys,kvp);
+        rc = b.InsertKeyVal(b.info.numkeys,kvp);
         if (rc) {  return rc; }
         if (TooFull) {
           // we split
@@ -570,17 +571,17 @@ ERROR_T BTreeIndex::InsertAtNode(SIZE_T &node,
 
         // Insert key and value into lhs and increment numkeys
         KeyValuePair kvp = KeyValuePair(key,value);
-        rc = lhs->SetKeyVal(offset,kvp);
+        rc = lhs->SetKeyVal(0,kvp);
         if (rc) {  return rc;  }
         lhs->info.numkeys++;
 
         // Insert ptr from root to lhs.
-        rc = b.SetPtr(offset,lhs_ptr);
+        rc = b.SetPtr(0,lhs_ptr);
         if (rc) {  return rc;  }
 
         // offset and ptr are both SIZE_T so after inserting one
         // ptr, I think we just increment offset
-        offset++; 
+        offset = 1; 
 
         // Insert key into root as well as ptr to (empty) rhs.
         KeyPointerPair kpp = KeyPointerPair(key,rhs_ptr);
@@ -610,7 +611,7 @@ ERROR_T BTreeIndex::InsertAtNode(SIZE_T &node,
           // this one, if it exists
           rc=b.GetPtr(offset,ptr);
           if (rc) { return rc; }
-          rc = InsertAtNode(ptr,key,value, rhs_created);
+          rc = InsertAtNode(ptr,key,value,maybe_rhs_key,maybe_rhs_ptr,rhs_created);
           if (rc) { return rc; }
           if (rhs_created) {
             KeyPointerPair kpp = KeyPointerPair(maybe_rhs_key, maybe_rhs_ptr);
@@ -688,7 +689,7 @@ ERROR_T BTreeIndex::InsertAtNode(SIZE_T &node,
       if (b.info.numkeys>0) { 
         rc=b.GetPtr(b.info.numkeys,ptr); //hopefully numkeys is what we want and not some offset
         if (rc) { return rc; }
-        rc = InsertAtNode(ptr,key,value, rhs_created);
+        rc = InsertAtNode(ptr,key,value,maybe_rhs_key,maybe_rhs_ptr,rhs_created);
         if (rc) { return rc; }
         if (rhs_created) {
           KeyPointerPair kpp = KeyPointerPair(maybe_rhs_key, maybe_rhs_ptr);
@@ -774,7 +775,8 @@ ERROR_T BTreeIndex::InsertAtNode(SIZE_T &node,
 
 ERROR_T BTreeIndex::Update(const KEY_T &key, const VALUE_T &value)
 {
-  return LookupOrUpdateInternal(superblock.info.rootnode, BTREE_OP_UPDATE, key, value);
+  VALUE_T val = value;
+  return LookupOrUpdateInternal(superblock.info.rootnode, BTREE_OP_UPDATE, key, val);
 }
 
   

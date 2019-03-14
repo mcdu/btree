@@ -118,6 +118,13 @@ public:
   // return ERROR_SIZE if the key or value are the wrong size for this index
   // return ERROR_CONFLICT if the key already exists and it's a unique index
   ERROR_T Insert(const KEY_T &key, const VALUE_T &value);
+  ERROR_T InsertAtNode(SIZE_T &node,
+                       const KEY_T &key,
+                       const VALUE_T &value,
+                       KEY_T &maybe_rhs_key,
+                       SIZE_T &maybe_rhs_ptr,
+                       bool &rhs_created);
+
   
   // return zero on success
   // return ERROR_NONEXISTENT  if the key doesn't exist

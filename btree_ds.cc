@@ -259,7 +259,7 @@ ERROR_T BTreeNode::GetKeyPtr(const SIZE_T offset, KeyPointerPair &p) const
   if (rc!=ERROR_NOERROR) { 
     return rc; 
   } else {
-    return GetPtr(offset,p.value);
+    return GetPtr(offset,p.pointer);
   }
 }
 
@@ -325,7 +325,7 @@ ERROR_T BTreeNode::SetKeyPtr(const SIZE_T offset, const KeyPointerPair &p)
   if (rc!=ERROR_NOERROR) { 
     return rc;
   } else {
-    return SetPtr(offset,p.value);
+    return SetPtr(offset,p.pointer);
   }
 }
 
