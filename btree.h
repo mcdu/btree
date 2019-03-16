@@ -125,9 +125,9 @@ public:
                        KEY_T &maybe_rhs_key,
                        SIZE_T &maybe_rhs_ptr,
                        bool &rhs_created);
-  ERROR_T SplitNode(BTreeNode &b,
-                    KEY_T &rhs_key,
-                    SIZE_T &rhs_ptr);
+  ERROR_T SplitNode(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs);
+  ERROR_T SplitLeaf(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs);
+
   
   // return zero on success
   // return ERROR_NONEXISTENT  if the key doesn't exist

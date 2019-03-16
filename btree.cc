@@ -479,6 +479,61 @@ ERROR_T BTreeIndex::SplitNode(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs)
   b.info.numkeys = lhs_numkeys;
 }
 
+ERROR_T BTreeIndex::SplitLeaf(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs)
+{
+  int lhs_numkeys = b.info.numkeys / 2;
+  int rhs_numkeys = b.info.numkeys / 2;
+  if (b.info.numkeys % 2 == 1) {  rhs_numkeys++;  }
+
+  BTreeNode rhs = b;
+  rhs.info.numkeys = rhs_numkeys;
+
+  // Write the key to be promoted into key_to_rhs.
+  // This is the key to be promoted from the split.
+  // It will be inserted into our parent node by our caller (i.e. 
+  // the last invocation of InsertAtNode on the call stack).
+  rc = b.GetKey(lhs_numkeys,key_to_rhs);
+  if (rc) {  return rc; }
+
+  // Allocate a node and write the block number allocated for it
+  // into ptr_to_rhs. Now when we serialize rhs to this block,
+  // maybe_rhs_ptr will be the ptr to it. Thus, maybe_rhs_ptr is the
+  // ptr associated with the promoted key.
+  rc = AllocateNode(ptr_to_rhs);
+  if (rc) {  return rc; }
+
+  // Copy b's rhs data into rhs's data starting from rhs's beginning
+  // b_offset is initialized to the point in b where rhs data begins
+  // rhs_offset is the point in rhs where we insert each kvp (from b)
+  SIZE_T b_offset, rhs_offset;
+  for (rhs_offset=0, b_offset=lhs_numkeys;
+       rhs_offset<rhs.info.numkeys;
+       rhs_offset++, b_offset++) {
+    
+    KeyValuePair copied_kvp;
+    rc = b.GetKeyVal(b_offset,copied_kvp);
+    if (rc) {  return rc;  }
+    rc = rhs.SetKeyVal(rhs_offset,copied_kvp);
+    if (rc) {  return rc;  }
+  }
+
+  // Copy the first pointer (does nothing right now)
+  SIZE_T copied_ptr;
+  rc = b.GetPtr(0,copied_ptr);
+  if (rc) {  return rc;  }
+  rc = rhs.SetPtr(0,copied_ptr);
+  if (rc) {  return rc;  }
+
+  // Finalize rhs by writing to the buffercache.
+  // No need to serialize b (our new lhs) here since our caller will.
+  rc = rhs.Serialize(buffercache,ptr_to_rhs);
+  if (rc) {  return rc; }
+
+  // Per piazza @487, this is enough to turn original node into lhs.
+  // Data clearing/overwriting unneeded but maybe useful for debugging
+  b.info.numkeys = lhs_numkeys;
+}
+
 // Explain params here
 // rhs_created:
 // Indicate to our caller that we split and created a rhs.
@@ -609,143 +664,34 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
         if (rc) {  return rc;  }
         if (testkey==key) {  return ERROR_CONFLICT;  }
         else if (key<testkey) {
-          int maxkeys = b.info.GetNumSlotsAsLeaf() * 2/3; //rounding?
-          bool TooFull = (b.info.numkeys >= maxkeys);
-            
           KeyValuePair kvp = KeyValuePair(key, value);
-          rc = b.InsertKeyVal(offset,kvp); //syntax?
+          rc = b.InsertKeyVal(offset,kvp);
           if (rc) {  return rc; }
+
+          int maxkeys = b.info.GetNumSlotsAsLeaf() * 2/3;
+          bool TooFull = (b.info.numkeys >= maxkeys);
           if (TooFull) {
-            // we split
-            int lhs_numkeys = b.info.numkeys / 2;
-            int rhs_numkeys = b.info.numkeys - lhs_numkeys;
-
-            // Create the new rhs node.
-            // 1 Copy b's info and data
-            BTreeNode *rhs = new BTreeNode(b); //TODO prob doesnt need to be ptr
-            // 2 Adjust numkeys, which also invalidates all the data after the
-            // first *rhs_numkeys* keys (per piazza @487)
-            rhs->info.numkeys = rhs_numkeys;
-            // 3 Copy b's rhs data into rhs's data starting from rhs's beginning
-            // b_offset is initialized to the point in b where rhs data begins
-            // rhs_offset is the point in rhs where we insert each kvp (from b)
-            SIZE_T b_offset, rhs_offset;
-            for (b_offset=lhs_numkeys, rhs_offset=0;
-                 offset<b.info.numkeys;
-                 b_offset++, rhs_offset++) {
-              KeyValuePair kvp;
-              rc = b.GetKeyVal(b_offset,kvp);
-              if (rc) {  return rc;  }
-              rc = rhs->SetKeyVal(rhs_offset,kvp);
-              if (rc) {  return rc;  }
-            }
-
-            // Write the rhs's first key into maybe_rhs_key.
-            // This is the key to be promoted from the split.
-            // It will be inserted into our parent node by our caller (i.e. 
-            // the last invocation of InsertAtNode on the call stack).
-            rc = rhs->GetKey(0,maybe_rhs_key);
-            if (rc) {  return rc; }
-
-            // Allocate a node and write the block number allocated for it
-            // into maybe_rhs_ptr. Now when we serialize rhs to this block,
-            // maybe_rhs_ptr will be the ptr to it. Thus, maybe_rhs_ptr is the
-            // ptr associated with the promoted key.
-            rc = AllocateNode(maybe_rhs_ptr);
-            if (rc) {  return rc; }
-
-            // Indicate to our caller that we split and created a rhs.
-            // Put another way, this signals to our caller that maybe_rhs_key
-            // and maybe_rhs_ptr are meaningful and in fact rhs's key and ptr.
-            // This ensures they'll be inserted into our parent node.
-            // TODO Maybe unnecessary; see if we can implement without this.
             rhs_created = true;
-
-            // Finalize rhs by writing to the buffercache.
-            rc = rhs->Serialize(buffercache,maybe_rhs_ptr);
+            rc = SplitLeaf(b,maybe_rhs_key,maybe_rhs_ptr)
             if (rc) {  return rc; }
-
-            // Per piazza @487, this is enough to turn original node into lhs.
-            // Data clearing/overwriting unneeded but maybe useful for debugging
-            b.info.numkeys = lhs_numkeys;
           }
-          // Finalize b by writing to the buffercache.
-          // If no split was necessary, then b is at this point just the
-          // original node post-insertion. If a split did occur, then b is
-          // the lhs post-split. In either case, it's serialized here.
        	  return b.Serialize(buffercache,node);
         }
       }
       if (b.info.numkeys>0) {
-        int maxkeys = b.info.GetNumSlotsAsLeaf() * 2/3; //rounding?
-        bool TooFull = (b.info.numkeys >= maxkeys);
-          
         KeyValuePair kvp = KeyValuePair(key, value);
-        //hopefully numkeys works again instead of an offset
-        //that's what dinda did in LookupOrUpdate after the for loop
         rc = b.InsertKeyVal(b.info.numkeys,kvp);
         if (rc) {  return rc; }
+
+        int maxkeys = b.info.GetNumSlotsAsLeaf() * 2/3;
+        bool TooFull = (b.info.numkeys >= maxkeys);
         if (TooFull) {
-          // we split
-          int lhs_numkeys = b.info.numkeys / 2;
-          int rhs_numkeys = b.info.numkeys - lhs_numkeys;
-
-          // Create the new rhs node.
-          // 1 Copy b's info and data
-          BTreeNode *rhs = new BTreeNode(b); //TODO prob doesnt need to be ptr
-          // 2 Adjust numkeys, which also invalidates all the data after the
-          // first *rhs_numkeys* keys (per piazza @487)
-          rhs->info.numkeys = rhs_numkeys;
-          // 3 Copy b's rhs data into rhs's data starting from rhs's beginning
-          // b_offset is initialized to the point in b where rhs data begins
-          // rhs_offset is the point in rhs where we insert each kvp (from b)
-          SIZE_T b_offset, rhs_offset;
-          for (b_offset=lhs_numkeys, rhs_offset=0;
-               offset<b.info.numkeys;
-               b_offset++, rhs_offset++) {
-            KeyValuePair kvp;
-            rc = b.GetKeyVal(b_offset,kvp);
-            if (rc) {  return rc;  }
-            rc = rhs->SetKeyVal(rhs_offset,kvp);
-            if (rc) {  return rc;  }
-          }
-
-          // Write the rhs's first key into maybe_rhs_key.
-          // This is the key to be promoted from the split.
-          // It will be inserted into our parent node by our caller (i.e. 
-          // the last invocation of InsertAtNode on the call stack).
-          rc = rhs->GetKey(0,maybe_rhs_key);
-          if (rc) {  return rc; }
-
-          // Allocate a node and write the block number allocated for it
-          // into maybe_rhs_ptr. Now when we serialize rhs to this block,
-          // maybe_rhs_ptr will be the ptr to it. Thus, maybe_rhs_ptr is the
-          // ptr associated with the promoted key.
-          rc = AllocateNode(maybe_rhs_ptr);
-          if (rc) {  return rc; }
-
-          // Indicate to our caller that we split and created a rhs.
-          // Put another way, this signals to our caller that maybe_rhs_key
-          // and maybe_rhs_ptr are meaningful and in fact rhs's key and ptr.
-          // This ensures they'll be inserted into our parent node.
-          // TODO Maybe unnecessary; see if we can implement without this.
           rhs_created = true;
-
-          // Finalize rhs by writing to the buffercache.
-          rc = rhs->Serialize(buffercache,maybe_rhs_ptr);
+          rc = SplitLeaf(b,maybe_rhs_key,maybe_rhs_ptr)
           if (rc) {  return rc; }
-
-          // Per piazza @487, this is enough to turn original node into lhs.
-          // Data clearing/overwriting unneeded but maybe useful for debugging
-          b.info.numkeys = lhs_numkeys;
         }
-        // Finalize b by writing to the buffercache.
-        // If no split was necessary, then b is at this point just the
-        // original node post-insertion. If a split did occur, then b is
-        // the lhs post-split. In either case, it's serialized here.
        	return b.Serialize(buffercache,node);
       }
-
       return ERROR_NOERROR;
       break;
     default:
