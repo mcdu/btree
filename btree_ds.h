@@ -99,10 +99,10 @@ struct BTreeNode {
 
   // Written by us.
   ERROR_T InsertKeyVal(const SIZE_T offset, const KeyValuePair &p); // Makes room for and then writes the ith key value pair (leaf)
-  //char *ResolveKeyPtr(const SIZE_T offset) const ; // Gives a pointer to the ith keypointer pair (leaf)
-  //ERROR_T GetKeyPtr(const SIZE_T offset, KeyPointerPair &p) const; // Gives  the ith key pointer pair (leaf)
-  //ERROR_T SetKeyPtr(const SIZE_T offset, const KeyPointerPair &p); // Writes the ith key pointer pair (leaf)
-  //ERROR_T InsertKeyPtr(const SIZE_T offset, const KeyPointerPair &p); // Makes room for and then writes the ith key pointer pair (leaf)
+  char *ResolveKeyPtr(const SIZE_T offset) const ; // Gives a pointer to the ith keypointer pair (leaf)
+  ERROR_T GetKeyPtr(const SIZE_T offset, KeyPointerPair &p) const; // Gives  the ith key pointer pair (leaf)
+  ERROR_T SetKeyPtr(const SIZE_T offset, const KeyPointerPair &p); // Writes the ith key pointer pair (leaf)
+  ERROR_T InsertKeyPtr(const SIZE_T offset, const KeyPointerPair &p); // Makes room for and then writes the ith key pointer pair (leaf)
 
 
   ostream &Print(ostream &rhs) const;

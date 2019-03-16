@@ -127,8 +127,7 @@ public:
                        bool &rhs_created);
   ERROR_T SplitNode(BTreeNode &b,
                     KEY_T &rhs_key,
-                    SIZE_T &rhs_ptr,
-                    bool &rhs_created);
+                    SIZE_T &rhs_ptr);
   
   // return zero on success
   // return ERROR_NONEXISTENT  if the key doesn't exist

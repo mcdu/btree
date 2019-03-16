@@ -196,10 +196,10 @@ char * BTreeNode::ResolveKeyVal(const SIZE_T offset) const
   return ResolveKey(offset);
 }
 
-//char * BTreeNode::ResolveKeyPtr(const SIZE_T offset) const
-//{
-//  return ResolveKey(offset);
-//}
+char * BTreeNode::ResolveKeyPtr(const SIZE_T offset) const
+{
+  return ResolveKey(offset);
+}
 
 ERROR_T BTreeNode::GetKey(const SIZE_T offset, KEY_T &k) const
 {
@@ -252,16 +252,16 @@ ERROR_T BTreeNode::GetKeyVal(const SIZE_T offset, KeyValuePair &p) const
 }
 
 
-//ERROR_T BTreeNode::GetKeyPtr(const SIZE_T offset, KeyPointerPair &p) const
-//{
-//  ERROR_T rc= GetKey(offset,p.key);
-//
-//  if (rc!=ERROR_NOERROR) { 
-//    return rc; 
-//  } else {
-//    return GetPtr(offset,p.pointer);
-//  }
-//}
+ERROR_T BTreeNode::GetKeyPtr(const SIZE_T offset, KeyPointerPair &p) const
+{
+  ERROR_T rc= GetKey(offset,p.key);
+
+  if (rc!=ERROR_NOERROR) { 
+    return rc; 
+  } else {
+    return GetPtr(offset+1,p.pointer);
+  }
+}
 
 
 ERROR_T BTreeNode::SetKey(const SIZE_T offset, const KEY_T &k)
@@ -318,16 +318,16 @@ ERROR_T BTreeNode::SetKeyVal(const SIZE_T offset, const KeyValuePair &p)
   }
 }
 
-//ERROR_T BTreeNode::SetKeyPtr(const SIZE_T offset, const KeyPointerPair &p)
-//{
-//  ERROR_T rc=SetKey(offset,p.key);
-//
-//  if (rc!=ERROR_NOERROR) { 
-//    return rc;
-//  } else {
-//    return SetPtr(offset,p.pointer);
-//  }
-//}
+ERROR_T BTreeNode::SetKeyPtr(const SIZE_T offset, const KeyPointerPair &p)
+{
+  ERROR_T rc=SetKey(offset,p.key);
+
+  if (rc!=ERROR_NOERROR) { 
+    return rc;
+  } else {
+    return SetPtr(offset+1,p.pointer);
+  }
+}
 
 ERROR_T BTreeNode::InsertKeyVal(const SIZE_T offset, const KeyValuePair &p)
 {
@@ -350,22 +350,26 @@ ERROR_T BTreeNode::InsertKeyVal(const SIZE_T offset, const KeyValuePair &p)
   return rc;
 }
 
-//ERROR_T BTreeNode::InsertKeyPtr(const SIZE_T offset, const KeyPointerPair &p)
-//{
-//  // make room for p by shifting existing, greater pairs over to the right
-//  // TODO should i be int or SIZE_T?
-//  for (SIZE_T i=this->info.numkeys;i>offset;i--) {
-//    KeyPointerPair tmp;
-//    this->GetKeyPtr((i-1),tmp);
-//    this->SetKeyPtr(i,tmp);
-//  }
-//  // set new p and update counter
-//  ERROR_T rc=SetKeyPtr(offset,p);
-//  if (rc==ERROR_NOERROR) { 
-//    this->info.numkeys++;
-//  }
-//  return rc;
-//}
+ERROR_T BTreeNode::InsertKeyPtr(const SIZE_T offset, const KeyPointerPair &p)
+{
+  // make room for p by shifting existing, greater pairs over to the right
+  ERROR_T rc;
+
+  info.numkeys++;
+  for (SIZE_T i=info.numkeys-1; (int)i-1>=(int)offset; i--) {
+    KeyPointerPair tmp;
+    rc = GetKeyPtr(i-1,tmp);
+    if (rc) {  return rc;  }
+    rc = SetKeyPtr(i,tmp);
+    if (rc) {  return rc;  }
+  }
+  // set new p and update counter
+  rc = SetKeyPtr(offset,p);
+  if (rc) {
+    info.numkeys--;
+  }
+  return rc;
+}
 
 ostream & BTreeNode::Print(ostream &os) const 
 {
