@@ -385,41 +385,39 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
   ERROR_T rc;
   bool c = false;
   rc = InsertAtNode(superblock.info.rootnode, key, value, mrk, mrp, c);
-  return rc;
+  if (rc) { return rc; }
+  if (c) {
+    BTreeNode curr_root, new_root;
+    rc = curr_root.Unserialize(buffercache, superblock.info.rootnode);
+    if (rc) { return rc; }
+    new_root = curr_root;
 
-  //if (rc) { return rc; }
-  //if (c) {
-  //    BTreeNode currRoot, newRoot;
-  //    rc = currRoot.Unserialize(buffercache, superblock.info.rootnode);
-  //    if (rc) { return rc; }
-  //    newRoot = currRoot;
+    new_root.info.numkeys = 1;
+    rc = new_root.SetKey(0, mrk);
+    if (rc) { return rc; }
+    rc = new_root.SetPtr(0, superblock.info.rootnode);
+    if (rc) { return rc; }
+    rc = new_root.SetPtr(0, mrp);
+    if (rc) { return rc; }
 
-  //    newRoot.info.numkeys = 1;
-  //    rc = newRoot.SetKey(0, mrk);
-  //    if (rc) { return rc; }
-  //    rc = newRoot.SetPtr(0, superblock.info.rootnode);
-  //    if (rc) { return rc; }
-  //    rc = newRoot.SetPtr(1, mrp);
-  //    if (rc) { return rc; }
+    // allocate space for new root on disk
+    SIZE_T root_block;
+    rc = AllocateNode(root_block);
+    if (rc) { return rc; }
 
-  //    // allocate space for new root on disk
-  //    SIZE_T rootBlock;
-  //    rc = AllocateNode(rootBlock);
-  //    if (rc) { return rc; }
+    superblock.info.rootnode = root_block;
 
-  //    // update superblock to pt to new root
-  //    superblock.info.rootnode = rootBlock;
-
-  //    // serialize new root to disk
-  //    rc = newRoot.Serialize(buffercache, rootBlock);
-  //    if (rc) { return rc; }
-  //}
-  //superblock.info.numkeys++;
-
+    rc = new_root.Serialize(buffercache, root_block);
+    if (rc) { return rc; }
+    
+    superblock.info.numkeys++;
+    return rc;
+  }
 }
 
 ERROR_T BTreeIndex::SplitNode(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs)
 {
+  ERROR_T rc;
   int lhs_numkeys = b.info.numkeys / 2;
   int rhs_numkeys = b.info.numkeys / 2;
   if (b.info.numkeys % 2 == 0) {  rhs_numkeys--;  }
@@ -463,6 +461,7 @@ ERROR_T BTreeIndex::SplitNode(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs)
     if (rc) {  return rc;  }
   }
 
+  SIZE_T copied_ptr;
   // Copy the last pointer
   rc = b.GetPtr(b_offset,copied_ptr);
   if (rc) {  return rc;  }
@@ -481,6 +480,7 @@ ERROR_T BTreeIndex::SplitNode(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs)
 
 ERROR_T BTreeIndex::SplitLeaf(BTreeNode &b,KEY_T &key_to_rhs,SIZE_T &ptr_to_rhs)
 {
+  ERROR_T rc;
   int lhs_numkeys = b.info.numkeys / 2;
   int rhs_numkeys = b.info.numkeys / 2;
   if (b.info.numkeys % 2 == 1) {  rhs_numkeys++;  }
@@ -566,6 +566,10 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
                                   b.info.valuesize,
                                   b.info.blocksize);
 
+        SIZE_T lhs_empty_ptr, rhs_empty_ptr;
+        rc = lhs.SetPtr(0,lhs_empty_ptr);
+        if (rc) {  return rc;  }
+
         KeyValuePair kvp = KeyValuePair(key,value);
         rc = lhs.InsertKeyVal(0,kvp);
         if (rc) {  return rc;  }
@@ -575,6 +579,9 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
                                   b.info.keysize,
                                   b.info.valuesize,
                                   b.info.blocksize);
+
+        rc = rhs.SetPtr(0,rhs_empty_ptr);
+        if (rc) {  return rc;  }
 
         // Allocate space and assign ptrs for new lhs and rhs leaf nodes.
         SIZE_T lhs_ptr, rhs_ptr;
@@ -620,11 +627,11 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
             rc = b.InsertKeyPtr(offset,kpp);
             if (rc) {  return rc; }
 
-            int maxkeys = b.info.GetNumSlotsAsInterior() * 2/3; //rounding?
+            int maxkeys = b.info.GetNumSlotsAsInterior() * 2/3;
             bool TooFull = (b.info.numkeys >= maxkeys);
             if (TooFull) {
               rhs_created = true;
-              rc = SplitNode(b,maybe_rhs_key,maybe_rhs_ptr)
+              rc = SplitNode(b,maybe_rhs_key,maybe_rhs_ptr);
               if (rc) {  return rc; }
             }
             rc = b.Serialize(buffercache,node);
@@ -647,7 +654,7 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
           bool TooFull = (b.info.numkeys >= maxkeys);
           if (TooFull) {
             rhs_created = true;
-            rc = SplitNode(b,maybe_rhs_key,maybe_rhs_ptr)
+            rc = SplitNode(b,maybe_rhs_key,maybe_rhs_ptr);
             if (rc) {  return rc; }
           }
           rc = b.Serialize(buffercache,node);
@@ -672,7 +679,7 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
           bool TooFull = (b.info.numkeys >= maxkeys);
           if (TooFull) {
             rhs_created = true;
-            rc = SplitLeaf(b,maybe_rhs_key,maybe_rhs_ptr)
+            rc = SplitLeaf(b,maybe_rhs_key,maybe_rhs_ptr);
             if (rc) {  return rc; }
           }
        	  return b.Serialize(buffercache,node);
@@ -687,12 +694,11 @@ ERROR_T BTreeIndex::InsertAtNode(const SIZE_T &node,
         bool TooFull = (b.info.numkeys >= maxkeys);
         if (TooFull) {
           rhs_created = true;
-          rc = SplitLeaf(b,maybe_rhs_key,maybe_rhs_ptr)
+          rc = SplitLeaf(b,maybe_rhs_key,maybe_rhs_ptr);
           if (rc) {  return rc; }
         }
        	return b.Serialize(buffercache,node);
       }
-      return ERROR_NOERROR;
       break;
     default:
       return ERROR_INSANE;
