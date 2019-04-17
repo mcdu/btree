@@ -1,8 +1,4 @@
-Welcome to BTree 
-
-(c) 2004 Peter A. Dinda, pdinda@northwestern.edu
-
-In this lab, you will write a tiny implementation of a B-Tree that
+Implementation of a B-Tree that
 will be run on top of a buffer cache that runs on top of a simulated
 disk system.  The simulator will accept a sequence of requests and
 print out the total time needed to complete the requests with your
@@ -208,12 +204,4 @@ do.  When test_me.pl is run, a test sequence is generated and run
 through both sim and ref_impl.pl.  compare.pl is then used to
 determine if there are any differences between the two outputs.
 
-
-Hand-in
--------
-
-You will be handing in btree.cc and btree.h, and any other files you
-add or modify. 
-
-We will test it using test_me.pl, but we won't tell you which random
-number seeds we'll use. 
+Projected based on description [here](http://pdinda.org/db/btree.pdf). Starter code provided by Peter Dinda.
