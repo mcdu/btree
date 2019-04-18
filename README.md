@@ -5,15 +5,12 @@ print out the total time needed to complete the requests with your
 B-Tree implementation.  The simulator will also print out the errors
 that occur.
 
-This is instructional code to support EECS 339, Introduction to
-Database Systems in the EECS Department at Northwestern University.
-
 Requirements
 ------------
 
 You must have the following software running:
 
-   GCC 3+ - we are using gcc 4.4.6 (Red Hat)
+   GCC 3+
    Perl 5.8+
 
 You must have enough disk space for the virtual disk
@@ -34,13 +31,13 @@ Contents
    disksystem.*    Simulated disk system with a few extra components
    buffercache.*   LRU buffercache implementation
 
-   btree.h         The required B-Tree interface
-   btree.cc        The btree implementation that you will write
-                   The handout version contains only stubs
+   btree.h         The B-Tree interface
+   btree.cc        The B-Tree implementation
+                   
 
    btree_ds.h
    btree_ds.cc     An implementation of the basic BTree data
-                   structures, which you are welcome to use
+                   structures
 
    makedisk.cc
    infodisk.cc
@@ -62,7 +59,7 @@ Contents
    btree_update.cc Update a key, value pair in the btree
    btree_lookup.cc Query for the value associated with a tree
    btree_show.cc   Display the btree as (key,value) pairs sorted in key order 
-   btree_sane.cc   Sanity Check the btree
+   btree_sane.cc   Sanity Check the btree (not done)
                    
 
    sim.cc          Simulator used to test performance and correctness 
@@ -71,7 +68,7 @@ Contents
    ref_impl.pl     Reference implementation in Perl for comparison
                    This is correct (when run with bug probability 0)
 
-   test_me.pl      Test the student's implementation (using sim)
+   test_me.pl      Test the implementation (using sim)
  
 
    test.pl         Test two implementations against each other
@@ -79,18 +76,6 @@ Contents
                    Generate a sequence of operations for use in testing
    compare.pl      Compare two outputs resulting from the same test sequence
   
-
-
-Installing Btree Lab
---------------------
-
-cd your_projects_directory
-tar xvfz btree_lab.tgz
-cd btree_lab
-touch .dependencies
-make depend
-make clean
-make
 
 
 Understanding Virtual Disk Systems
@@ -139,10 +124,6 @@ can improve performance.
 Btree
 -----
 
-You will implement the Btree class described in btree.h, btree.cc and
-the handout.  Once this is implemented, the btree_* tools and sim 
-will be functional.
-
 The btree_* tools allow you to manipulate the btree stored on the
 virtual disk.  Each tool does exactly one operation.  The btree 
 state persists (in the disk files) from operation to operation.  
@@ -182,7 +163,7 @@ UPDATE key value
     "OK" if the key already exists.  If it does not already exist, 
     the btree should not be modified and the reply is "FAIL".
 
-DELETE key
+DELETE key (not yet implemented)
    
   - sim should delete the key and its associated value and reply 
     "OK" if the key already exists.  If it does not already exist, 
