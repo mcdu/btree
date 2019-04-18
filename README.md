@@ -1,7 +1,7 @@
 Implementation of a B-Tree that
 will be run on top of a buffer cache that runs on top of a simulated
 disk system.  The simulator will accept a sequence of requests and
-print out the total time needed to complete the requests with your
+print out the total time needed to complete the requests with the
 B-Tree implementation.  The simulator will also print out the errors
 that occur.
 
